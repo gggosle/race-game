@@ -242,12 +242,10 @@ class RaceManager {
                 startBtn.style.display = 'none';
                 restartBtn.style.display = 'none';
                 resetBtn.style.display = 'none';
-                setupBtn.disabled = false;
                 racingArea.style.display = 'none';
                 break;
             case 'setup':
                 startBtn.style.display = 'inline-block';
-                startBtn.disabled = false;
                 restartBtn.style.display = 'none';
                 resetBtn.style.display = 'none';
                 racingArea.style.display = 'none';
@@ -255,7 +253,6 @@ class RaceManager {
             case 'ready':
                 controlsInit.style.display = 'none';
                 startBtn.style.display = 'inline-block';
-                startBtn.disabled = false;
                 restartBtn.style.display = 'none';
                 resetBtn.style.display = 'inline-block';
                 racingArea.style.display = 'block';
@@ -264,7 +261,6 @@ class RaceManager {
                 controlsInit.style.display = 'none';
                 startBtn.style.display = 'none';
                 restartBtn.style.display = 'inline-block';
-                restartBtn.disabled = false;
                 resetBtn.style.display = 'inline-block';
                 break;
             case 'finished':
