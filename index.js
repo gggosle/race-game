@@ -50,8 +50,23 @@ class Car {
         }
         this.speed = Math.floor(Math.random() * 50) + 5;
     }
+
+    serialize() {
+        return {
+            color: this.color,
+            name: this.name,
+            wins: this.wins,
+        };
+    }
+
+    static deserialize(data) {
+        const car = new Car(data.color, data.name);
+        car.wins = data.wins || 0;
+        return car;
+    }
 }
 
+const controlsInit = document.getElementById('controls-init');
 const carCountInput = document.getElementById('car-count');
 const setupBtn = document.getElementById('setup-btn');
 const carInputsContainer = document.getElementById('car-inputs-container');
@@ -64,6 +79,49 @@ const resultsDiv = document.getElementById('results');
 
 let cars = [];
 let finishedCars = [];
+
+function saveCarsToLocalStorage() {
+    const serializedCars = cars.map(car => car.serialize());
+    localStorage.setItem('raceGameCars', JSON.stringify(serializedCars));
+}
+
+function loadCarsFromLocalStorage() {
+    const savedCars = localStorage.getItem('raceGameCars');
+    if (savedCars) {
+        const carData = JSON.parse(savedCars);
+        cars = carData.map(data => Car.deserialize(data));
+        
+        // Restore UI
+        controlsInit.style.display = 'none';
+        racingArea.style.display = 'block';
+        tracksContainer.innerHTML = '';
+        
+        cars.forEach((car, index) => {
+            const track = document.createElement('div');
+            track.className = 'track';
+            track.appendChild(car.createNode());
+            
+            const distanceDisplay = document.createElement('span');
+            distanceDisplay.className = 'distance-display';
+            distanceDisplay.style.marginLeft = '80px';
+            distanceDisplay.style.color = '#fff';
+            distanceDisplay.style.fontSize = '12px';
+            distanceDisplay.textContent = ' 0m';
+            track.appendChild(distanceDisplay);
+            
+            tracksContainer.appendChild(track);
+        });
+
+        startBtn.style.display = 'inline-block';
+        startBtn.disabled = false;
+        restartBtn.style.display = 'none';
+        resetBtn.style.display = 'none';
+        setupBtn.disabled = false;
+    }
+}
+
+// Load on start
+window.addEventListener('load', loadCarsFromLocalStorage);
 
 setupBtn.addEventListener('click', () => {
     const count = parseInt(carCountInput.value);
@@ -87,6 +145,7 @@ setupBtn.addEventListener('click', () => {
     
     racingArea.style.display = 'none';
     resultsDiv.textContent = '';
+    localStorage.removeItem('raceGameCars');
 });
 
 function initRace() {
@@ -116,9 +175,11 @@ function initRace() {
     });
 
     racingArea.style.display = 'block';
+    saveCarsToLocalStorage();
 }
 
 startBtn.addEventListener('click', () => {
+    controlsInit.style.display = 'none';
     if (cars.length === 0) {
         initRace();
     }
@@ -129,6 +190,7 @@ startBtn.addEventListener('click', () => {
     startBtn.disabled = true;
     startBtn.style.display = 'none';
     setupBtn.disabled = true;
+
     restartBtn.style.display = 'none';
     resetBtn.style.display = 'none';
 
@@ -143,6 +205,7 @@ startBtn.addEventListener('click', () => {
                 car.wins++;
                 car.updateWinsDisplay();
                 resultsDiv.textContent = `Winner: ${name}!`;
+                saveCarsToLocalStorage();
             }
             if (finishedCars.length === cars.length) {
                 restartBtn.style.display = 'inline-block';
@@ -173,11 +236,12 @@ restartBtn.addEventListener('click', () => {
 resetBtn.addEventListener('click', () => {
     cars.forEach(car => car.reset());
     cars = [];
+    localStorage.removeItem('raceGameCars');
     racingArea.style.display = 'none';
     tracksContainer.innerHTML = '';
     carInputsContainer.innerHTML = '';
     resultsDiv.textContent = '';
-    
+    controlsInit.style.display = 'block';
     startBtn.style.display = 'none';
     startBtn.disabled = true;
     restartBtn.style.display = 'none';
