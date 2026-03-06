@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Car Racing Game</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f0f0f0;
+        }
+
+        .controls {
+            margin-bottom: 20px;
+            padding: 10px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .car-inputs {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .car-input-group {
+            border: 1px solid #ccc;
+            padding: 10px;
+            border-radius: 4px;
+        }
+
+        #racing-area {
+            position: relative;
+            width: 100%;
+            background-color: #333;
+            border-radius: 8px;
+            overflow: hidden;
+            padding: 10px 0;
+            margin-top: 20px;
+            display: none;
+        }
+
+        .track {
+            height: 60px;
+            border-bottom: 1px dashed #fff;
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .track:last-child {
+            border-bottom: none;
+        }
+
+        .car-node {
+            position: absolute;
+            left: 0;
+            width: 60px;
+            height: 40px;
+            background-color: red;
+            border-radius: 4px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 10px;
+            font-weight: bold;
+            transition: left 0.1s linear;
+            z-index: 2;
+        }
+
+        .finish-line {
+            position: absolute;
+            right: 20px;
+            top: 0;
+            bottom: 0;
+            width: 5px;
+            background-color: #ffd700;
+            z-index: 1;
+        }
+
+        .race-control-btn  {
+            display: none;
+            margin-right: 10px;
+        }
+
+        #results {
+            margin-top: 20px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+<div class="controls">
+    <label for="car-count">Number of cars:</label>
+    <input type="number" id="car-count" min="1" max="10" value="3">
+    <button id="setup-btn">Setup Cars</button>
+    <div id="car-inputs-container" class="car-inputs"></div>
+    <div style="margin-top: 10px;">
+        <button id="start-btn" class="race-control-btn" disabled>Start Race</button>
+        <button id="restart-btn" class="race-control-btn">Restart Race</button>
+        <button id="reset-btn" class="race-control-btn">Reset All</button>
+    </div>
+</div>
+
+<div id="racing-area">
+    <div class="finish-line"></div>
+    <div id="tracks-container"></div>
+</div>
+
+<div id="results"></div>
+
+<script src="index.js"></script>
+</body>
+</html>
