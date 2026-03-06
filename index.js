@@ -91,7 +91,6 @@ function loadCarsFromLocalStorage() {
         const carData = JSON.parse(savedCars);
         cars = carData.map(data => Car.deserialize(data));
         
-        // Restore UI
         controlsInit.style.display = 'none';
         racingArea.style.display = 'block';
         tracksContainer.innerHTML = '';
@@ -115,12 +114,11 @@ function loadCarsFromLocalStorage() {
         startBtn.style.display = 'inline-block';
         startBtn.disabled = false;
         restartBtn.style.display = 'none';
-        resetBtn.style.display = 'none';
+        resetBtn.style.display = 'inline-block';
         setupBtn.disabled = false;
     }
 }
 
-// Load on start
 window.addEventListener('load', loadCarsFromLocalStorage);
 
 setupBtn.addEventListener('click', () => {
@@ -189,10 +187,6 @@ startBtn.addEventListener('click', () => {
     
     startBtn.disabled = true;
     startBtn.style.display = 'none';
-    setupBtn.disabled = true;
-
-    restartBtn.style.display = 'none';
-    resetBtn.style.display = 'none';
 
     const finishLinePos = racingArea.clientWidth - 80; 
 
@@ -206,11 +200,11 @@ startBtn.addEventListener('click', () => {
                 car.updateWinsDisplay();
                 resultsDiv.textContent = `Winner: ${name}!`;
                 saveCarsToLocalStorage();
-            }
-            if (finishedCars.length === cars.length) {
                 restartBtn.style.display = 'inline-block';
                 resetBtn.style.display = 'inline-block';
-                setupBtn.disabled = false;
+            }
+            if (finishedCars.length === cars.length) {
+
                 resultsDiv.textContent += ` All cars finished.`;
             }
         }, (pos) => {
@@ -230,7 +224,7 @@ restartBtn.addEventListener('click', () => {
     startBtn.style.display = 'inline-block';
     startBtn.disabled = false;
     restartBtn.style.display = 'none';
-    resetBtn.style.display = 'none';
+    resetBtn.style.display = "inline-block";
 });
 
 resetBtn.addEventListener('click', () => {
