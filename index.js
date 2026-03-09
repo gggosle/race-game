@@ -5,9 +5,9 @@ const CONFIG = {
     FINISH_LINE_OFFSET: 80,
     TICK_INTERVAL: 50,
     DEFAULT_CAR_COUNT: 3,
-    GEAR_MULTIPLIERS: [3.0, 2.0, 1.5, 1.2, 1.0, 0.8], // Gear 1 = 3.0, Gear 2 = 2.0, etc.
-    ACCELERATION_MULTIPLIER: 100, // Multiplier for more dynamic feel
-    SPEED_SCALE_KMH_TO_PX: (1000 / 3600) * 10, // 1 km/h = 0.277... m/s * 10px/m
+    GEAR_MULTIPLIERS: [3.0, 2.0, 1.5, 1.2, 1.0, 0.8],
+    ACCELERATION_MULTIPLIER: 100, 
+    SPEED_SCALE_KMH_TO_PX: (1000 / 3600) * 10, 
     SAFETY_CAP_SECONDS: 1000
 };
 
@@ -50,7 +50,6 @@ class Car {
     calculateAcceleration(v, gear = this.currentGear) {
         const ptwRatio = this.power / this.weight;
         
-        // Use the provided gear or the car's current gear
         let activeGear = gear;
         if (activeGear < this.numGears && v >= this.maxVelocitiesPerGear[activeGear - 1]) {
             activeGear++;
@@ -104,16 +103,23 @@ class Car {
         }
     }
 
+    updatePhysics(dt) {
+        const { acceleration, gear } = this.calculateAcceleration(this.velocity);
+        this.currentGear = gear;
+        
+        this.velocity += acceleration * dt * CONFIG.ACCELERATION_MULTIPLIER;
+        const distanceDelta = (this.velocity * CONFIG.SPEED_SCALE_KMH_TO_PX) * dt;
+        this.position += distanceDelta;
+        
+        return { acceleration, gear, distanceDelta };
+    }
+
     move(finishLinePos, onFinish, onTick) {
         const dt = CONFIG.TICK_INTERVAL / 1000;
 
         this.intervalId = setInterval(() => {
-            const { acceleration, gear } = this.calculateAcceleration(this.velocity);
-            this.currentGear = gear;
-            
-            this.velocity += acceleration * dt * CONFIG.ACCELERATION_MULTIPLIER;
-            const newPos = this.position + (this.velocity * CONFIG.SPEED_SCALE_KMH_TO_PX) * dt;
-            this.updatePosition(newPos);
+            this.updatePhysics(dt);
+            this.updatePosition(this.position);
             
             onTick(Math.round(this.position));
 
@@ -134,21 +140,22 @@ class Car {
     simulateFinishTime(finishLinePos) {
         const dt = CONFIG.TICK_INTERVAL / 1000;
         
-        let simVelocity = this.velocity;
-        let simPosition = this.position;
-        let simGear = this.currentGear;
+        const originalVelocity = this.velocity;
+        const originalPosition = this.position;
+        const originalGear = this.currentGear;
+        
         let totalTime = 0;
-
-        while (simPosition < finishLinePos && totalTime < CONFIG.SAFETY_CAP_SECONDS) {
-            const { acceleration, gear } = this.calculateAcceleration(simVelocity, simGear);
-            simGear = gear;
-
-            simVelocity += acceleration * dt * CONFIG.ACCELERATION_MULTIPLIER;
-            simPosition += (simVelocity * CONFIG.SPEED_SCALE_KMH_TO_PX) * dt;
+        while (this.position < finishLinePos && totalTime < CONFIG.SAFETY_CAP_SECONDS) {
+            this.updatePhysics(dt);
             totalTime += dt;
         }
 
-        return totalTime;
+        const resultTime = totalTime;
+        this.velocity = originalVelocity;
+        this.position = originalPosition;
+        this.currentGear = originalGear;
+
+        return resultTime;
     }
 
     skipToFinish(finishLinePos) {
@@ -307,7 +314,6 @@ class RaceManager {
             car.distanceDisplay = distanceDisplay;
             this.elements.tracksContainer.appendChild(track);
             
-            // Sync car position if it was loaded from storage or reset
             car.updatePosition(car.position);
         });
     }
