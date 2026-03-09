@@ -4,7 +4,8 @@ const CONFIG = {
     MAX_SPEED: 55,
     FINISH_LINE_OFFSET: 80,
     TICK_INTERVAL: 100,
-    DEFAULT_CAR_COUNT: 3
+    DEFAULT_CAR_COUNT: 3,
+    SPEED_MULTIPLIER: 2
 };
 
 class Car {
@@ -64,6 +65,10 @@ class Car {
         }
     }
 
+    speedUp() {
+        this.speed *= CONFIG.SPEED_MULTIPLIER;
+    }
+
     reset() {
         this.stop();
         this.position = 0;
@@ -97,6 +102,7 @@ class RaceManager {
             setupBtn: document.getElementById('setup-btn'),
             carInputsContainer: document.getElementById('car-inputs-container'),
             startBtn: document.getElementById('start-btn'),
+            speedUpBtn: document.getElementById('speed-up-btn'),
             restartBtn: document.getElementById('restart-btn'),
             resetBtn: document.getElementById('reset-btn'),
             racingArea: document.getElementById('racing-area'),
@@ -111,8 +117,13 @@ class RaceManager {
     initEventListeners() {
         this.elements.setupBtn.addEventListener('click', () => this.handleSetup());
         this.elements.startBtn.addEventListener('click', () => this.handleStart());
+        this.elements.speedUpBtn.addEventListener('click', () => this.handleSpeedUp());
         this.elements.restartBtn.addEventListener('click', () => this.handleRestart());
         this.elements.resetBtn.addEventListener('click', () => this.handleResetAll());
+    }
+
+    handleSpeedUp() {
+        this.cars.forEach(car => car.speedUp());
     }
 
     handleSetup() {
@@ -234,18 +245,20 @@ class RaceManager {
     }
 
     updateUIState(state) {
-        const { controlsInit, startBtn, restartBtn, resetBtn, setupBtn, racingArea } = this.elements;
+        const { controlsInit, startBtn, speedUpBtn, restartBtn, resetBtn, setupBtn, racingArea } = this.elements;
 
         switch (state) {
             case 'init':
                 controlsInit.style.display = 'block';
                 startBtn.style.display = 'none';
+                speedUpBtn.style.display = 'none';
                 restartBtn.style.display = 'none';
                 resetBtn.style.display = 'none';
                 racingArea.style.display = 'none';
                 break;
             case 'setup':
                 startBtn.style.display = 'inline-block';
+                speedUpBtn.style.display = 'none';
                 restartBtn.style.display = 'none';
                 resetBtn.style.display = 'none';
                 racingArea.style.display = 'none';
@@ -253,6 +266,7 @@ class RaceManager {
             case 'ready':
                 controlsInit.style.display = 'none';
                 startBtn.style.display = 'inline-block';
+                speedUpBtn.style.display = 'none';
                 restartBtn.style.display = 'none';
                 resetBtn.style.display = 'inline-block';
                 racingArea.style.display = 'block';
@@ -260,10 +274,12 @@ class RaceManager {
             case 'racing':
                 controlsInit.style.display = 'none';
                 startBtn.style.display = 'none';
+                speedUpBtn.style.display = 'inline-block';
                 restartBtn.style.display = 'inline-block';
                 resetBtn.style.display = 'inline-block';
                 break;
             case 'finished':
+                speedUpBtn.style.display = 'none';
                 restartBtn.style.display = 'inline-block';
                 resetBtn.style.display = 'inline-block';
                 break;
