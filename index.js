@@ -5,7 +5,6 @@ const CONFIG = {
     FINISH_LINE_OFFSET: 80,
     TICK_INTERVAL: 50,
     DEFAULT_CAR_COUNT: 3,
-    SPEED_MULTIPLIER: 2,
     GEAR_MULTIPLIERS: [3.0, 2.0, 1.5, 1.2, 1.0, 0.8] // Gear 1 = 3.0, Gear 2 = 2.0, etc.
 };
 
@@ -36,7 +35,7 @@ class Car {
         this.numGears = Math.floor(Math.random() * (6 - 4 + 1)) + 4; // 4 to 6 gears
 
         const ptwRatio = this.power / this.weight;
-        this.topSpeed = Math.min(380, 100 + (ptwRatio * 500)); // km/h
+        this.topSpeed = Math.min(380, 100 + (ptwRatio * 500));
 
         this.maxVelocitiesPerGear = [];
         for (let i = 1; i <= this.numGears; i++) {
@@ -82,24 +81,21 @@ class Car {
         }
     }
 
+    updateStatsDisplay() {
+        if (this.element) {
+            const statsDiv = this.element.querySelector('.stats');
+            if (statsDiv) statsDiv.textContent = `${this.power}hp / ${this.weight}kg`;
+        }
+    }
+
     move(finishLinePos, onFinish, onTick) {
-        // Scale factor: km/h to px per tick
-        // 1 km/h = (1000m / 3600s) = 0.2777... m/s
-        // Let's assume 1m = 10px (just for visualization)
-        // TICK_INTERVAL is in ms, so dt = TICK_INTERVAL / 1000 seconds
         const dt = CONFIG.TICK_INTERVAL / 1000;
-        const speedScale = (1000 / 3600) * 10; // km/h to px/s
+        const speedScale = (1000 / 3600) * 10;
 
         this.intervalId = setInterval(() => {
             const acceleration = this.calculateAcceleration(this.velocity);
             
-            // Frame-by-frame update logic
-            // v = v + a * dt
-            // Assuming 'a' here is in km/h/s (since power/weight * gMult is dimensionless, wait)
-            // Let's re-examine the formula: a = (P/m) * Gmult * (1 - v/vmax)
-            // (hp/kg) is not exactly acceleration units, but let's treat it as the change in km/h per second
-            
-            this.velocity += acceleration * dt * 100; // *100 to make it feel more dynamic in-game
+            this.velocity += acceleration * dt * 100;
             this.position += (this.velocity * speedScale) * dt;
 
             if (this.element) {
@@ -121,8 +117,45 @@ class Car {
         }
     }
 
-    speedUp() {
-        this.velocity += 20;
+    simulateFinishTime(finishLinePos) {
+        const dt = CONFIG.TICK_INTERVAL / 1000;
+        const speedScale = (1000 / 3600) * 10;
+        
+        let simVelocity = this.velocity;
+        let simPosition = this.position;
+        let simGear = this.currentGear;
+        let totalTime = 0;
+
+        while (simPosition < finishLinePos && totalTime < 1000) {
+            const ptwRatio = this.power / this.weight;
+            if (simGear < this.numGears && simVelocity >= this.maxVelocitiesPerGear[simGear - 1]) {
+                simGear++;
+            }
+            const vMaxGear = this.maxVelocitiesPerGear[simGear - 1];
+            const gMult = CONFIG.GEAR_MULTIPLIERS[simGear - 1] || 1.0;
+            
+            let acceleration = 0;
+            if (simVelocity < vMaxGear) {
+                acceleration = ptwRatio * gMult * (1 - (simVelocity / vMaxGear));
+            }
+
+            simVelocity += acceleration * dt * 100;
+            simPosition += (simVelocity * speedScale) * dt;
+            totalTime += dt;
+        }
+
+        return totalTime;
+    }
+
+    skipToFinish(finishLinePos) {
+        this.stop();
+        this.position = finishLinePos;
+        if (this.element) {
+            this.element.style.left = `${this.position}px`;
+        }
+        if (this.distanceDisplay) {
+            this.distanceDisplay.textContent = ` ${Math.round(this.position)}m`;
+        }
     }
 
     reset() {
@@ -133,7 +166,8 @@ class Car {
         if (this.element) {
             this.element.style.left = '0px';
         }
-        this.generateStats(); // Re-randomize stats on reset
+        this.generateStats();
+        this.updateStatsDisplay();
     }
 
     serialize() {
@@ -141,31 +175,11 @@ class Car {
             color: this.color,
             name: this.name,
             wins: this.wins,
-            weight: this.weight,
-            power: this.power,
-            numGears: this.numGears,
-            topSpeed: this.topSpeed,
-            maxVelocitiesPerGear: this.maxVelocitiesPerGear
         };
     }
 
     static deserialize(data) {
-        const car = new Car(data.color, data.name, data.wins || 0);
-        // Restore stats from storage if they exist
-        if (data.weight) {
-            car.weight = data.weight;
-            car.power = data.power;
-            car.numGears = data.numGears;
-            car.topSpeed = data.topSpeed;
-            car.maxVelocitiesPerGear = data.maxVelocitiesPerGear;
-            
-            // Re-render stats in node if it exists
-            if (car.element) {
-                const statsDiv = car.element.querySelector('.stats');
-                if (statsDiv) statsDiv.textContent = `${car.power}hp / ${car.weight}kg`;
-            }
-        }
-        return car;
+        return new Car(data.color, data.name, data.wins || 0);
     }
 }
 
@@ -180,7 +194,7 @@ class RaceManager {
             setupBtn: document.getElementById('setup-btn'),
             carInputsContainer: document.getElementById('car-inputs-container'),
             startBtn: document.getElementById('start-btn'),
-            speedUpBtn: document.getElementById('speed-up-btn'),
+            skipBtn: document.getElementById('skip-btn'),
             restartBtn: document.getElementById('restart-btn'),
             resetBtn: document.getElementById('reset-btn'),
             racingArea: document.getElementById('racing-area'),
@@ -195,13 +209,28 @@ class RaceManager {
     initEventListeners() {
         this.elements.setupBtn.addEventListener('click', () => this.handleSetup());
         this.elements.startBtn.addEventListener('click', () => this.handleStart());
-        this.elements.speedUpBtn.addEventListener('click', () => this.handleSpeedUp());
+        this.elements.skipBtn.addEventListener('click', () => this.handleSkip());
         this.elements.restartBtn.addEventListener('click', () => this.handleRestart());
         this.elements.resetBtn.addEventListener('click', () => this.handleResetAll());
     }
 
-    handleSpeedUp() {
-        this.cars.forEach(car => car.speedUp());
+    handleSkip() {
+        if (this.finishedCars.length < this.cars.length) {
+            const finishLinePos = this.elements.racingArea.clientWidth - CONFIG.FINISH_LINE_OFFSET;
+            
+            const remainingCars = this.cars
+                .filter(car => !this.finishedCars.includes(car))
+                .map(car => ({
+                    car,
+                    remainingTime: car.simulateFinishTime(finishLinePos)
+                }))
+                .sort((a, b) => a.remainingTime - b.remainingTime);
+
+            remainingCars.forEach(({car}) => {
+                car.skipToFinish(finishLinePos);
+                this.handleCarFinished(car);
+            });
+        }
     }
 
     handleSetup() {
@@ -323,20 +352,20 @@ class RaceManager {
     }
 
     updateUIState(state) {
-        const { controlsInit, startBtn, speedUpBtn, restartBtn, resetBtn, setupBtn, racingArea } = this.elements;
+        const { controlsInit, startBtn, skipBtn, restartBtn, resetBtn, racingArea } = this.elements;
 
         switch (state) {
             case 'init':
                 controlsInit.style.display = 'block';
                 startBtn.style.display = 'none';
-                speedUpBtn.style.display = 'none';
+                skipBtn.style.display = 'none';
                 restartBtn.style.display = 'none';
                 resetBtn.style.display = 'none';
                 racingArea.style.display = 'none';
                 break;
             case 'setup':
                 startBtn.style.display = 'inline-block';
-                speedUpBtn.style.display = 'none';
+                skipBtn.style.display = 'none';
                 restartBtn.style.display = 'none';
                 resetBtn.style.display = 'none';
                 racingArea.style.display = 'none';
@@ -344,7 +373,7 @@ class RaceManager {
             case 'ready':
                 controlsInit.style.display = 'none';
                 startBtn.style.display = 'inline-block';
-                speedUpBtn.style.display = 'none';
+                skipBtn.style.display = 'none';
                 restartBtn.style.display = 'none';
                 resetBtn.style.display = 'inline-block';
                 racingArea.style.display = 'block';
@@ -352,12 +381,12 @@ class RaceManager {
             case 'racing':
                 controlsInit.style.display = 'none';
                 startBtn.style.display = 'none';
-                speedUpBtn.style.display = 'inline-block';
+                skipBtn.style.display = 'inline-block';
                 restartBtn.style.display = 'inline-block';
                 resetBtn.style.display = 'inline-block';
                 break;
             case 'finished':
-                speedUpBtn.style.display = 'none';
+                skipBtn.style.display = 'none';
                 restartBtn.style.display = 'inline-block';
                 resetBtn.style.display = 'inline-block';
                 break;
