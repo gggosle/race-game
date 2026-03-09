@@ -5,7 +5,10 @@ const CONFIG = {
     FINISH_LINE_OFFSET: 80,
     TICK_INTERVAL: 50,
     DEFAULT_CAR_COUNT: 3,
-    GEAR_MULTIPLIERS: [3.0, 2.0, 1.5, 1.2, 1.0, 0.8] // Gear 1 = 3.0, Gear 2 = 2.0, etc.
+    GEAR_MULTIPLIERS: [3.0, 2.0, 1.5, 1.2, 1.0, 0.8], // Gear 1 = 3.0, Gear 2 = 2.0, etc.
+    ACCELERATION_MULTIPLIER: 100, // Multiplier for more dynamic feel
+    SPEED_SCALE_KMH_TO_PX: (1000 / 3600) * 10, // 1 km/h = 0.277... m/s * 10px/m
+    SAFETY_CAP_SECONDS: 1000
 };
 
 class Car {
@@ -44,21 +47,24 @@ class Car {
         }
     }
 
-    calculateAcceleration(v) {
+    calculateAcceleration(v, gear = this.currentGear) {
         const ptwRatio = this.power / this.weight;
         
-        if (this.currentGear < this.numGears && v >= this.maxVelocitiesPerGear[this.currentGear - 1]) {
-            this.currentGear++;
+        // Use the provided gear or the car's current gear
+        let activeGear = gear;
+        if (activeGear < this.numGears && v >= this.maxVelocitiesPerGear[activeGear - 1]) {
+            activeGear++;
         }
 
-        const vMaxGear = this.maxVelocitiesPerGear[this.currentGear - 1];
-        const gMult = CONFIG.GEAR_MULTIPLIERS[this.currentGear - 1] || 1.0;
+        const vMaxGear = this.maxVelocitiesPerGear[activeGear - 1];
+        const gMult = CONFIG.GEAR_MULTIPLIERS[activeGear - 1] || 1.0;
 
         if (v >= vMaxGear) {
-            return 0;
+            return { acceleration: 0, gear: activeGear };
         }
 
-        return ptwRatio * gMult * (1 - (v / vMaxGear));
+        const acceleration = ptwRatio * gMult * (1 - (v / vMaxGear));
+        return { acceleration, gear: activeGear };
     }
 
     createNode() {
@@ -88,19 +94,27 @@ class Car {
         }
     }
 
+    updatePosition(pos) {
+        this.position = pos;
+        if (this.element) {
+            this.element.style.left = `${this.position}px`;
+        }
+        if (this.distanceDisplay) {
+            this.distanceDisplay.textContent = ` ${Math.round(this.position)}m`;
+        }
+    }
+
     move(finishLinePos, onFinish, onTick) {
         const dt = CONFIG.TICK_INTERVAL / 1000;
-        const speedScale = (1000 / 3600) * 10;
 
         this.intervalId = setInterval(() => {
-            const acceleration = this.calculateAcceleration(this.velocity);
+            const { acceleration, gear } = this.calculateAcceleration(this.velocity);
+            this.currentGear = gear;
             
-            this.velocity += acceleration * dt * 100;
-            this.position += (this.velocity * speedScale) * dt;
-
-            if (this.element) {
-                this.element.style.left = `${this.position}px`;
-            }
+            this.velocity += acceleration * dt * CONFIG.ACCELERATION_MULTIPLIER;
+            const newPos = this.position + (this.velocity * CONFIG.SPEED_SCALE_KMH_TO_PX) * dt;
+            this.updatePosition(newPos);
+            
             onTick(Math.round(this.position));
 
             if (this.position >= finishLinePos) {
@@ -119,28 +133,18 @@ class Car {
 
     simulateFinishTime(finishLinePos) {
         const dt = CONFIG.TICK_INTERVAL / 1000;
-        const speedScale = (1000 / 3600) * 10;
         
         let simVelocity = this.velocity;
         let simPosition = this.position;
         let simGear = this.currentGear;
         let totalTime = 0;
 
-        while (simPosition < finishLinePos && totalTime < 1000) {
-            const ptwRatio = this.power / this.weight;
-            if (simGear < this.numGears && simVelocity >= this.maxVelocitiesPerGear[simGear - 1]) {
-                simGear++;
-            }
-            const vMaxGear = this.maxVelocitiesPerGear[simGear - 1];
-            const gMult = CONFIG.GEAR_MULTIPLIERS[simGear - 1] || 1.0;
-            
-            let acceleration = 0;
-            if (simVelocity < vMaxGear) {
-                acceleration = ptwRatio * gMult * (1 - (simVelocity / vMaxGear));
-            }
+        while (simPosition < finishLinePos && totalTime < CONFIG.SAFETY_CAP_SECONDS) {
+            const { acceleration, gear } = this.calculateAcceleration(simVelocity, simGear);
+            simGear = gear;
 
-            simVelocity += acceleration * dt * 100;
-            simPosition += (simVelocity * speedScale) * dt;
+            simVelocity += acceleration * dt * CONFIG.ACCELERATION_MULTIPLIER;
+            simPosition += (simVelocity * CONFIG.SPEED_SCALE_KMH_TO_PX) * dt;
             totalTime += dt;
         }
 
@@ -149,23 +153,14 @@ class Car {
 
     skipToFinish(finishLinePos) {
         this.stop();
-        this.position = finishLinePos;
-        if (this.element) {
-            this.element.style.left = `${this.position}px`;
-        }
-        if (this.distanceDisplay) {
-            this.distanceDisplay.textContent = ` ${Math.round(this.position)}m`;
-        }
+        this.updatePosition(finishLinePos);
     }
 
     reset() {
         this.stop();
-        this.position = 0;
         this.velocity = 0;
         this.currentGear = 1;
-        if (this.element) {
-            this.element.style.left = '0px';
-        }
+        this.updatePosition(0);
         this.generateStats();
         this.updateStatsDisplay();
     }
@@ -263,10 +258,7 @@ class RaceManager {
     }
 
     handleRestart() {
-        this.cars.forEach(car => {
-            car.reset();
-            if (car.distanceDisplay) car.distanceDisplay.textContent = ' 0m';
-        });
+        this.cars.forEach(car => car.reset());
         this.finishedCars = [];
         this.elements.resultsDiv.textContent = '';
         this.updateUIState('ready');
@@ -314,6 +306,9 @@ class RaceManager {
             
             car.distanceDisplay = distanceDisplay;
             this.elements.tracksContainer.appendChild(track);
+            
+            // Sync car position if it was loaded from storage or reset
+            car.updatePosition(car.position);
         });
     }
 
@@ -354,43 +349,58 @@ class RaceManager {
     updateUIState(state) {
         const { controlsInit, startBtn, skipBtn, restartBtn, resetBtn, racingArea } = this.elements;
 
-        switch (state) {
-            case 'init':
-                controlsInit.style.display = 'block';
-                startBtn.style.display = 'none';
-                skipBtn.style.display = 'none';
-                restartBtn.style.display = 'none';
-                resetBtn.style.display = 'none';
-                racingArea.style.display = 'none';
-                break;
-            case 'setup':
-                startBtn.style.display = 'inline-block';
-                skipBtn.style.display = 'none';
-                restartBtn.style.display = 'none';
-                resetBtn.style.display = 'none';
-                racingArea.style.display = 'none';
-                break;
-            case 'ready':
-                controlsInit.style.display = 'none';
-                startBtn.style.display = 'inline-block';
-                skipBtn.style.display = 'none';
-                restartBtn.style.display = 'none';
-                resetBtn.style.display = 'inline-block';
-                racingArea.style.display = 'block';
-                break;
-            case 'racing':
-                controlsInit.style.display = 'none';
-                startBtn.style.display = 'none';
-                skipBtn.style.display = 'inline-block';
-                restartBtn.style.display = 'inline-block';
-                resetBtn.style.display = 'inline-block';
-                break;
-            case 'finished':
-                skipBtn.style.display = 'none';
-                restartBtn.style.display = 'inline-block';
-                resetBtn.style.display = 'inline-block';
-                break;
-        }
+        const states = {
+            init: {
+                controlsInit: 'block',
+                startBtn: 'none',
+                skipBtn: 'none',
+                restartBtn: 'none',
+                resetBtn: 'none',
+                racingArea: 'none'
+            },
+            setup: {
+                controlsInit: 'block',
+                startBtn: 'inline-block',
+                skipBtn: 'none',
+                restartBtn: 'none',
+                resetBtn: 'none',
+                racingArea: 'none'
+            },
+            ready: {
+                controlsInit: 'none',
+                startBtn: 'inline-block',
+                skipBtn: 'none',
+                restartBtn: 'none',
+                resetBtn: 'inline-block',
+                racingArea: 'block'
+            },
+            racing: {
+                controlsInit: 'none',
+                startBtn: 'none',
+                skipBtn: 'inline-block',
+                restartBtn: 'inline-block',
+                resetBtn: 'inline-block',
+                racingArea: 'block'
+            },
+            finished: {
+                controlsInit: 'none',
+                startBtn: 'none',
+                skipBtn: 'none',
+                restartBtn: 'inline-block',
+                resetBtn: 'inline-block',
+                racingArea: 'block'
+            }
+        };
+
+        const config = states[state];
+        if (!config) return;
+
+        controlsInit.style.display = config.controlsInit;
+        startBtn.style.display = config.startBtn;
+        skipBtn.style.display = config.skipBtn;
+        restartBtn.style.display = config.restartBtn;
+        resetBtn.style.display = config.resetBtn;
+        racingArea.style.display = config.racingArea;
     }
 
     saveToStorage() {
