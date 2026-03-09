@@ -1,7 +1,5 @@
 const CONFIG = {
     STORAGE_KEY: 'raceGameCars',
-    MIN_SPEED: 5,
-    MAX_SPEED: 55,
     FINISH_LINE_OFFSET: 80,
     TICK_INTERVAL: 50,
     DEFAULT_CAR_COUNT: 3,
@@ -114,14 +112,12 @@ class Car {
         return { acceleration, gear, distanceDelta };
     }
 
-    move(finishLinePos, onFinish, onTick) {
+    move(finishLinePos, onFinish) {
         const dt = CONFIG.TICK_INTERVAL / 1000;
 
         this.intervalId = setInterval(() => {
             this.updatePhysics(dt);
             this.updatePosition(this.position);
-            
-            onTick(Math.round(this.position));
 
             if (this.position >= finishLinePos) {
                 this.stop();
@@ -307,14 +303,11 @@ class RaceManager {
             
             const distanceDisplay = document.createElement('span');
             distanceDisplay.className = 'distance-display';
-            distanceDisplay.style.cssText = 'margin-left: 80px; color: #fff; font-size: 12px;';
-            distanceDisplay.textContent = ' 0m';
             track.appendChild(distanceDisplay);
             
             car.distanceDisplay = distanceDisplay;
-            this.elements.tracksContainer.appendChild(track);
-            
             car.updatePosition(car.position);
+            this.elements.tracksContainer.appendChild(track);
         });
     }
 
@@ -328,10 +321,7 @@ class RaceManager {
         this.cars.forEach(car => {
             car.move(
                 finishLinePos,
-                (finishedCar) => this.handleCarFinished(finishedCar),
-                (pos) => {
-                    if (car.distanceDisplay) car.distanceDisplay.textContent = ` ${pos}m`;
-                }
+                (finishedCar) => this.handleCarFinished(finishedCar)
             );
         });
     }
